@@ -104,73 +104,595 @@ This script pushes PDFs into a consistent Drive hierarchy for Colab workers. [3]
 
 ## PDF denoising and cleaning in Colab
 
-Cleaning runs in Google Colab using a denoising pipeline (e.g., pikepdf for structural fixes, PyMuPDF for page ops, OCR with Tesseract if needed, and noise filtering via OpenCV for scanned images). Processing 7k+ documents is distributed across 4 notebooks for throughput. [3]
+Below is a ready-to-copy README.md in clean, professional Markdown format.
+No placeholders, no comments — just paste it directly into your GitHub repository.
 
-- Example Colab cell (Python) for page-level cleanup:
-```python
-!pip -q install pikepdf pymupdf opencv-python pytesseract pdf2image
 
-import os, fitz, cv2, tempfile
-from pdf2image import convert_from_path
-import pytesseract
-from pikepdf import Pdf, PdfError
+---
 
-SOURCE_DIR = "/content/drive/MyDrive/company-ingest/raw"
-CLEAN_DIR = "/content/drive/MyDrive/company-ingest/clean"
+📄 Batch PDF Processing Pipeline with OCR, LangChain & ChromaDB
 
-os.makedirs(CLEAN_DIR, exist_ok=True)
+This repository implements a production-grade batch PDF ingestion pipeline designed for RAG (Retrieval-Augmented Generation) systems. It processes multiple PDFs from a Google Drive folder, automatically applies OCR fallback, performs chunking, hashing, vectorization, and finally stores processed files into structured Google Drive directories.
 
-def clean_pdf(src_path, dst_path, ocr=True, dpi=300):
-    try:
-        # Structural repair
-        with Pdf.open(src_path) as pdf:
-            pdf.save(dst_path)
-    except PdfError:
-        dst_path = dst_path  # proceed with re-render
 
-    # Re-render pages and apply denoise
-    images = convert_from_path(src_path, dpi=dpi)
-    cleaned_images = []
-    for img in images:
-        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
-            img.save(tmp.name)
-            mat = cv2.imread(tmp.name, cv2.IMREAD_GRAYSCALE)
-            mat = cv2.fastNlMeansDenoising(mat, h=10, templateWindowSize=7, searchWindowSize=21)
-            mat = cv2.threshold(mat, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)[1]
-            cv2.imwrite(tmp.name, mat)
-            cleaned_images.append(tmp.name)
+---
 
-    # Rebuild PDF (with optional OCR text layer)
-    doc = fitz.open()
-    for p in cleaned_images:
-        pix = fitz.Pixmap(p)
-        rect = fitz.Rect(0, 0, pix.width, pix.height)
-        page = doc.new_page(width=pix.width, height=pix.height)
-        page.insert_image(rect, filename=p)
-        if ocr:
-            text = pytesseract.image_to_string(p)
-            page.insert_textbox(rect, text, fontsize=1)  # lightweight text layer
-    doc.save(dst_path)
-    doc.close()
+🚀 Key Features
 
-for root, _, files in os.walk(SOURCE_DIR):
-    for f in files:
-        if f.lower().endswith(".pdf"):
-            src = os.path.join(root, f)
-            rel = os.path.relpath(src, SOURCE_DIR)
-            out = os.path.join(CLEAN_DIR, rel)
-            os.makedirs(os.path.dirname(out), exist_ok=True)
-            try:
-                clean_pdf(src, out)
-                print("Cleaned:", rel)
-            except Exception as e:
-                print("Failed:", rel, e)
+🔍 Batch PDF Detection (auto scans Drive folder for new PDFs)
+
+🧾 Metadata Extraction + OCR Fallback for scanned/unreadable PDFs
+
+🧩 Text Chunking optimized for retrieval
+
+🔐 Chunk Hashing to ensure deduplication
+
+🧠 HuggingFace Embeddings integrated via LangChain
+
+🗂️ Persistent ChromaDB Vector Store
+
+📁 Google Drive File Management
+
+Moves processed PDFs → ProcessedDocs/
+
+Moves failed PDFs → FailedDocs/
+
+
+🔄 Fully automated end-to-end pipeline
+
+
+
+---
+
+📦 Architecture Overview
+
+Google Drive (Input Folder)
+        │
+        ├── Batch Loader (glob / Drive API)
+        │
+        ├── Document Processor
+        │     ├── PDF Text Extraction
+        │     ├── Metadata Check
+        │     ├── OCR Fallback if Needed (Tesseract)
+        │     └── Chunking + Hashing
+        │
+        ├── Embedding Generator (HuggingFace → LangChain)
+        │
+        ├── Vector Storage (ChromaDB)
+        │
+        └── Google Drive Output Folder
+              ├── ProcessedDocs/
+              └── FailedDocs/
+
+
+---
+
+📁 Google Drive Folder Structure
+
+MyDrive/
+ ├── InsuranceDocs/        # Input PDFs - the batch source
+ ├── ProcessedDocs/        # PDFs successfully processed and indexed
+ └── FailedDocs/           # PDFs that failed OCR or text extraction
+
+
+---
+
+⚙️ How the Pipeline Works
+
+1️⃣ Batch PDF Detection
+
+The pipeline detects all PDFs inside the Google Drive input folder:
+
+pdf_files = glob.glob("/content/drive/MyDrive/InsuranceDocs/*.pdf")
+
+This enables large-scale automated ingestion — no manual file selection required.
+
+
+---
+
+2️⃣ Per-File Processing Loop
+
+Each PDF is processed sequentially:
+
+for pdf_path in pdf_files:
+    process_document(pdf_path)
+
+This ensures uniform handling across clean PDFs, scanned PDFs, and mixed-content documents.
+
+
+---
+
+3️⃣ Metadata Extraction + OCR Fallback
+
+The system first attempts normal PDF text extraction:
+
+doc = PyPDFLoader(pdf_path).load()
+
+If metadata or text extraction fails (common in scanned PDFs), the system automatically applies OCR:
+
+text = run_tesseract_ocr(pdf_path)
+
+OCR fallback triggers when:
+
+Extracted text is empty
+
+Critical metadata is missing
+
+Extraction errors occur
+
+Pages contain only images
+
+
+
+---
+
+4️⃣ Chunking & Hashing
+
+Extracted text is segmented into retrieval-friendly chunks:
+
+chunks = chunk_document(text)
+
+Each chunk is hashed for deduplication:
+
+chunk_id = sha256(chunk_text)
+
+Why hashing?
+
+Prevents duplicate data in the vector store
+
+Detects repeated documents across multiple uploads
+
+Ensures ChromaDB inserts are idempotent
+
+
+
+---
+
+5️⃣ Embeddings + ChromaDB Insert
+
+Text chunks are embedded using HuggingFace models (via LangChain) and stored in ChromaDB:
+
+store.add_texts(
+    texts=[chunk.page_content],
+    metadatas=[chunk.metadata],
+    ids=[chunk_id]
+)
+
+Using chunk hashes as IDs effectively eliminates duplicates.
+
+
+---
+
+6️⃣ Storing Processed PDFs in Google Drive
+
+After successful vectorization, the file is moved to the processed folder:
+
+shutil.move(pdf_path, "/content/drive/MyDrive/ProcessedDocs/")
+
+This ensures:
+
+No file is processed twice
+
+Input folder stays clean
+
+Easy audit trail of processed documents
+
+
+
+---
+
+7️⃣ Handling Failures
+
+If extraction or OCR fails:
+
+shutil.move(pdf_path, "/content/drive/MyDrive/FailedDocs/")
+
+Keeps faulty uploads isolated from the main ingestion flow.
+
+
+---
+
+🧠 End-to-End Summary
+
+1. Load all PDFs from Drive batch folder
+
+
+2. Loop through each file
+
+
+3. Extract metadata → OCR fallback if required
+
+
+4. Chunk + hash text for deduplication
+
+
+5. Generate embeddings with HuggingFace
+
+
+6. Store chunks in ChromaDB
+
+
+7. Move processed PDFs to ProcessedDocs/
+
+
+8. Move failures to FailedDocs/
+
+
+
+This pipeline is designed for reliability, automation, and scalability for any RAG-based document intelligence system.
+
+
+
+
+---
+
+🛠️ Tech Stack
+
+Component	Technology
+
+OCR	Tesseract OCR
+LLM Pipeline	LangChain
+Embeddings	HuggingFace Transformers
+Vector DB	ChromaDB (Persistent Mode)
+File Storage	Google Drive
+PDF Parsing	PyPDF2 / PyPDFLoader
+Hashing	SHA256
+
+
+
+---
+
+📌 Ideal Use Cases
+
+Insurance document indexing
+
+Contract repositories
+
+Legal PDF knowledge bases
+
+Financial statement ingestion
+
+Enterprise RAG systems
+
+OCR-heavy enterprise workflows
+
+
+
 ```
 
-- Suggested denoising heuristics:
-  - Fast non-local means for background speckle removal.
-  - Otsu thresholding for binarization.
-  - Optional OCR pass for scanned pages to ensure retrievability.
+# -*- coding: utf-8 -*-
+"""Batch 3.ipynb
+
+Automatically generated by Colab.
+
+Original file is located at
+    https://colab.research.google.com/drive/1og69qR0MiruiRslztal2zDSW_iFli3ww
+"""
+
+from google.colab import files
+uploaded = files.upload()
+
+# FULL OCR PIPELINE - integrated: auth, batch download, image processing, run pipeline
+# Run this in Colab after uploading client_secrets.json or placing it in your Satadru Drive.
+
+# --------------------------- INSTALL & IMPORTS --------------------------- #
+!pip install -U -q PyDrive pdf2image opencv-python-headless pandas imutils img2pdf pytesseract
+!apt-get install -y -qq tesseract-ocr poppler-utils
+
+import os, json, gc, zipfile, traceback, datetime, time, shutil
+import numpy as np
+import pandas as pd
+import cv2, imutils
+from PIL import Image
+from pdf2image import convert_from_path, pdfinfo_from_path
+from pydrive.auth import GoogleAuth
+from pydrive.drive import GoogleDrive
+from google.colab import drive as colab_drive, files as colab_files
+
+# --------------------------- AUTHENTICATION --------------------------- #
+# 1) Reliance Drive via PyDrive (client_secrets.json must be present in runtime or in Satadru Drive)
+gauth = GoogleAuth()
+gauth.LoadClientConfigFile("client_secrets.json")   # ensure file is present
+gauth.CommandLineAuth()  # copy-paste auth code when prompted
+rel_drive = GoogleDrive(gauth)
+
+# 2) Mount Satadru personal Drive (satadru.ola@gmail.com) to persist files
+colab_drive.mount('/content/my_drive', force_remount=True)
+
+# --------------------------- PATH CONFIG & CREATION --------------------------- #
+SATADRU_BASE = "/content/my_drive/MyDrive/OCR_Pipeline"
+LOGS_DIR = os.path.join(SATADRU_BASE, "Logs")
+INPUT_DIR = os.path.join(SATADRU_BASE, "Input_PDFs")          # persisted downloaded PDFs
+OUTPUT_FOLDER = os.path.join(SATADRU_BASE, "OCR_Output")      # âœ… permanent folder for processed PDFs
+TEMP_IMAGE_FOLDER = "/content/temp_images"                    # ephemeral (fast) temporary images
+
+METRICS_CSV = os.path.join(LOGS_DIR, "pdf_quality_metrics.csv")
+TRACKER_FILE = os.path.join(LOGS_DIR, "progress_tracker.json")
+BATCH_FILE_IN_SATADRU = os.path.join(LOGS_DIR, "batch_3.json")  # persisted copy of batch JSON (if present)
+ERROR_LOG_FILE = os.path.join(LOGS_DIR, "error_log.txt")
+
+DPI = 200
+ZIP_BATCH_SIZE = 500   # how many PDFs per ZIP before saving/uploading/downloading
+
+# ensure directories exist
+os.makedirs(LOGS_DIR, exist_ok=True)
+os.makedirs(INPUT_DIR, exist_ok=True)
+os.makedirs(OUTPUT_FOLDER, exist_ok=True)     # âœ… now inside Satadru Drive for persistence
+os.makedirs(TEMP_IMAGE_FOLDER, exist_ok=True)
+
+print("Paths ready:")
+print(" - Logs:", LOGS_DIR)
+print(" - Input PDFs (persisted):", INPUT_DIR)
+print(" - Output (persisted):", OUTPUT_FOLDER)
+print(" - Temp images (ephemeral):", TEMP_IMAGE_FOLDER)
+
+
+# --------------------------- TRACKER HELPERS --------------------------- #
+def load_tracker():
+    if os.path.exists(TRACKER_FILE):
+        with open(TRACKER_FILE, "r") as f:
+            return json.load(f)
+    return {"processed": []}
+
+def save_tracker(tracker):
+    with open(TRACKER_FILE, "w") as f:
+        json.dump(tracker, f, indent=2)
+
+def log_error(pdf_path, page_num, error):
+    with open(ERROR_LOG_FILE, "a") as f:
+        f.write(f"---\nPDF: {pdf_path}, Page: {page_num}\n")
+        f.write(traceback.format_exc())
+        f.write("\n")
+
+# --------------------------- IMAGE PROCESSING HELPERS --------------------------- #
+def denoise_image(image):
+    """Reduce speckle and compression noise."""
+    try:
+        return cv2.fastNlMeansDenoisingColored(image, None, 10, 10, 7, 21)
+    except Exception:
+        return image
+
+def orientation_fix(image):
+    """Auto-rotate using OCR-based orientation detection with a fallback."""
+    try:
+        osd = pytesseract.image_to_osd(image)
+        rotation = int([line for line in osd.split("\n") if "Rotate" in line][0].split(":")[-1].strip())
+        if rotation != 0:
+            image = imutils.rotate_bound(image, -rotation)
+    except Exception:
+        try:
+            text_normal = pytesseract.image_to_string(image)
+            flipped = cv2.rotate(image, cv2.ROTATE_180)
+            text_flipped = pytesseract.image_to_string(flipped)
+            if len(text_flipped.strip()) > len(text_normal.strip()):
+                image = flipped
+        except Exception:
+            pass
+    return image
+
+def preprocess_image(image):
+    """Downscale huge images, denoise and fix orientation. Returns (denoised, fixed)."""
+    try:
+        if image.shape[0] > 8000 or image.shape[1] > 8000:
+            scale = 8000.0 / max(image.shape[0], image.shape[1])
+            new_w = int(image.shape[1] * scale)
+            new_h = int(image.shape[0] * scale)
+            image = cv2.resize(image, (new_w, new_h))
+            print(f"âš ï¸ Downscaled large image to {image.shape}")
+    except Exception as e:
+        print(f"âš ï¸ Warning in resizing: {e}")
+    denoised = denoise_image(image)
+    fixed = orientation_fix(denoised)
+    return denoised, fixed
+
+def save_pdf(image_list, output_pdf_path):
+    """Combine processed images back into a single PDF."""
+    if not image_list:
+        return
+    images = [Image.fromarray(img).convert("RGB") for img in image_list]
+    images[0].save(output_pdf_path, save_all=True, append_images=images[1:])
+    print(f"[OK] Saved OCR-ready PDF: {output_pdf_path}")
+
+# --------------------------- MAIN PROCESS FUNCTION --------------------------- #
+def analyze_and_preprocess_pdf(pdf_path):
+    pdf_name = os.path.basename(pdf_path)
+    preprocessed_images = []
+    char_counts, blur_list, contrast_list, failed_pages = [], [], [], []
+    metrics = {"PDF_File": pdf_name}
+
+    try:
+        info = pdfinfo_from_path(pdf_path)
+        num_pages = info.get('Pages', None)
+    except Exception:
+        num_pages = None
+
+    try:
+        if num_pages is None:
+            images = convert_from_path(pdf_path, dpi=DPI)
+        else:
+            images = [convert_from_path(pdf_path, dpi=DPI, first_page=i, last_page=i)[0]
+                      for i in range(1, num_pages + 1)]
+    except Exception as e:
+        log_error(pdf_path, "ALL", e)
+        metrics.update({"Status": "Failed", "Failed_Pages": "ALL"})
+        return metrics, None
+
+    for page_num, image in enumerate(images, start=1):
+        try:
+            np_img = np.array(image)
+            denoised, final_img = preprocess_image(np_img)
+            preprocessed_images.append(final_img)
+
+            gray = cv2.cvtColor(final_img, cv2.COLOR_RGB2GRAY)
+            blur_list.append(np.var(cv2.Laplacian(gray, cv2.CV_64F)))
+            contrast_list.append(np.std(gray))
+            text = pytesseract.image_to_string(final_img)
+            char_counts.append(len(text.strip()))
+
+            # cleanup per-page
+            del np_img, denoised, final_img, gray, text
+            gc.collect()
+        except Exception as e:
+            failed_pages.append(page_num)
+            log_error(pdf_path, page_num, e)
+
+    metrics.update({
+        "Num_Pages": len(images),
+        "Avg_Blur": float(np.mean(blur_list)) if blur_list else 0.0,
+        "Avg_Contrast": float(np.mean(contrast_list)) if contrast_list else 0.0,
+        "Avg_CharCount": float(np.mean(char_counts)) if char_counts else 0.0,
+        "Failed_Pages": ",".join(map(str, failed_pages)) if failed_pages else "",
+        "Status": "Success" if (len(failed_pages) < len(images)) else "Failed"
+    })
+
+    if metrics["Avg_CharCount"] == 0 and metrics["Status"] != "Failed":
+        metrics["Status"] = "Failed"
+        metrics["Failed_Pages"] = "ALL"
+
+    return metrics, preprocessed_images
+
+# --------------------------- BATCH DETECTION & DOWNLOAD --------------------------- #
+# Decide whether to use existing tracker or download batch_3.json from Reliance Drive
+if os.path.exists(TRACKER_FILE):
+    print("âœ… Tracker found in Satadru Drive - resuming.")
+    tracker = load_tracker()
+    processed = set(tracker.get("processed", []))
+    # Load batch file if present to know assigned PDF set
+    if os.path.exists(BATCH_FILE_IN_SATADRU):
+        with open(BATCH_FILE_IN_SATADRU, "r") as f:
+            batch_files = json.load(f)
+    else:
+        # fallback: treat all files in INPUT_DIR as the batch (if any)
+        batch_files = sorted([f for f in os.listdir(INPUT_DIR) if f.lower().endswith(".pdf")])
+else:
+    print("âš ï¸ No tracker found. Attempting to fetch batch_3.json from Reliance Drive.")
+    file_list = rel_drive.ListFile({'q': "title='batch_3.json' and trashed=false"}).GetList()
+    if not file_list:
+        raise FileNotFoundError("batch_3.json not found in Reliance Drive. Upload it into Reliance Logs.")
+    file_list[0].GetContentFile(BATCH_FILE_IN_SATADRU)
+    with open(BATCH_FILE_IN_SATADRU, "r") as f:
+        batch_files = json.load(f)
+    tracker = {"processed": []}
+    processed = set()
+
+print(f"Assigned batch: {len(batch_files)} PDFs")
+# Compute remaining PDFs to download/process
+remaining_pdfs = [p for p in batch_files if os.path.basename(p) not in processed]
+
+# Download only remaining PDFs from Reliance Drive into SATADRU INPUT_DIR
+for pdf_name in remaining_pdfs:
+    local_path = os.path.join(INPUT_DIR, pdf_name)
+    if os.path.exists(local_path):
+        print(f"â†³ already exists locally: {pdf_name}")
+        continue
+
+    # Escape single quotes for safe Drive query
+    safe_name = os.path.basename(pdf_name).replace("'", "\\'")
+    q = f"title contains '{os.path.splitext(os.path.basename(pdf_name))[0]}' and trashed=false"
+
+    try:
+        found = rel_drive.ListFile({'q': q}).GetList()
+    except Exception as e:
+        print(f"âŒ Query failed for {pdf_name}: {e}")
+        with open(ERROR_LOG_FILE, "a") as elog:
+            elog.write(f"Query failed for {pdf_name}: {traceback.format_exc()}\n")
+        continue
+
+    if not found:
+        print(f"âš ï¸ Not found in Reliance Drive: {pdf_name}")
+        with open(ERROR_LOG_FILE, "a") as elog:
+            elog.write(f"Missing in Reliance drive: {pdf_name}\n")
+        continue
+
+    try:
+        found[0].GetContentFile(local_path)
+        print(f"âœ… Downloaded: {pdf_name}")
+    except Exception as e:
+        print(f"âŒ Failed to download {pdf_name}: {e}")
+        with open(ERROR_LOG_FILE, "a") as elog:
+            elog.write(f"Download failed: {pdf_name}\n{traceback.format_exc()}\n")
+
+# Ensure tracker file exists
+if not os.path.exists(TRACKER_FILE):
+    save_tracker(tracker)
+
+# --------------------------- RUN PIPELINE --------------------------- #
+PDF_FOLDER_LOCAL = INPUT_DIR
+tracker = load_tracker()
+metrics_df = pd.read_csv(METRICS_CSV) if os.path.exists(METRICS_CSV) else pd.DataFrame()
+
+# Build list of PDFs to process (preserve ordering from batch_files)
+all_pdfs = [os.path.join(PDF_FOLDER_LOCAL, f) for f in batch_files if os.path.basename(f).lower().endswith(".pdf")]
+total_pdfs = len(all_pdfs)
+print(f"Starting processing loop: {total_pdfs} total (will skip already-processed).")
+
+batch_counter = 0
+for pdf_path in all_pdfs:
+    file_name = os.path.basename(pdf_path)
+    tracker = load_tracker()   # reload to minimize concurrent write surprises
+    if file_name in tracker.get("processed", []):
+        # skip already processed
+        continue
+
+    print(f"\nâž¡ï¸ Processing: {file_name}")
+    try:
+        metrics, preprocessed_images = analyze_and_preprocess_pdf(pdf_path)
+        metrics_df = pd.concat([metrics_df, pd.DataFrame([metrics])], ignore_index=True)
+
+        if preprocessed_images:
+            output_pdf_path = os.path.join(OUTPUT_FOLDER, file_name)
+            save_pdf(preprocessed_images, output_pdf_path)
+            batch_counter += 1
+
+        # update tracker & metrics persistently
+        tracker = load_tracker()
+        tracker.setdefault("processed", []).append(file_name)
+        save_tracker(tracker)
+        metrics_df.to_csv(METRICS_CSV, index=False)
+        print(f"âœ… Progress: {len(tracker['processed'])}/{total_pdfs} PDFs processed")
+
+    except Exception as e:
+        print(f"âŒ Fatal error while processing {file_name}: {e}")
+        log_error(pdf_path, "ALL", e)
+        # don't append to processed, so it can be retried later
+
+    # ---- ZIP AND SAVE AFTER EACH BATCH ----
+    if batch_counter >= ZIP_BATCH_SIZE or pdf_path == all_pdfs[-1]:
+        zip_name = f"/content/OCR_Batch_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+        with zipfile.ZipFile(zip_name, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for root, _, files_in_folder in os.walk(OUTPUT_FOLDER):
+                for file in files_in_folder:
+                    zipf.write(os.path.join(root, file), arcname=file)
+        print(f"ðŸ“¦ Created ZIP archive: {zip_name}")
+        # If you want the browser to download automatically, uncomment the next line:
+        # colab_files.download(zip_name)
+
+        # OPTIONAL: upload ZIP back to Reliance Drive or Satadru Drive (uncomment & edit target folder)
+        # upload_file = rel_drive.CreateFile({'title': os.path.basename(zip_name), 'parents': [{'id': '<RELIANCE_TARGET_FOLDER_ID>'}]})
+        # upload_file.SetContentFile(zip_name)
+        # upload_file.Upload()
+        # print(f"â¬†ï¸ Uploaded ZIP to Reliance Drive: {upload_file['title']}")
+
+        # cleanup ephemeral output folder for next batch
+        # cleanup only temp images (not Drive outputs)
+        try:
+            shutil.rmtree(TEMP_IMAGE_FOLDER)
+            os.makedirs(TEMP_IMAGE_FOLDER, exist_ok=True)
+        except Exception as e:
+            print(f"âš ï¸ Temp cleanup failed: {e}")
+        batch_counter = 0
+        print("ðŸ§¹ Cleaned temp images after batch ZIP")
+
+
+
+print("\nðŸŽ¯ Pipeline run complete. Tracker and metrics saved in Satadru Drive Logs.")
+print(f" - Tracker: {TRACKER_FILE}")
+print(f" - Metrics CSV: {METRICS_CSV}")
+print(f" - Error log: {ERROR_LOG_FILE}")
+```
+
+---
+
 
 ***
 
