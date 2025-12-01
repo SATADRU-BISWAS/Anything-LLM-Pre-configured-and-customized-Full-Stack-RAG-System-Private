@@ -117,6 +117,8 @@ This repository implements a production-grade batch PDF ingestion pipeline desig
 
 ---
 
+
+
 🚀 Key Features
 
 🔍 Batch PDF Detection (auto scans Drive folder for new PDFs)
@@ -144,6 +146,8 @@ Moves failed PDFs → FailedDocs/
 
 ---
 
+```
+
 📦 Architecture Overview
 
 Google Drive (Input Folder)
@@ -163,18 +167,20 @@ Google Drive (Input Folder)
         └── Google Drive Output Folder
               ├── ProcessedDocs/
               └── FailedDocs/
-
+```
 
 ---
 
 📁 Google Drive Folder Structure
+
+```
 
 MyDrive/
  ├── InsuranceDocs/        # Input PDFs - the batch source
  ├── ProcessedDocs/        # PDFs successfully processed and indexed
  └── FailedDocs/           # PDFs that failed OCR or text extraction
 
-
+```
 ---
 
 ⚙️ How the Pipeline Works
