@@ -702,36 +702,289 @@ print(f" - Error log: {ERROR_LOG_FILE}")
 
 ***
 
-## Decentralized processing with 4 Colab notebooks
+## Decentralized processing with 4 Colab notebooks with dividing the unprocessed pds into separate batches
 
-To accelerate processing of 7k+ PDFs, documents are partitioned into 4 batches and assigned to 4 notebooks across 3 Colab platforms, improving throughput substantially. Each notebook targets a distinct subfolder in Drive. [3]
+Below is a clean, professional, GitHub-ready README.md that is:
 
-- Example batch assignment snippet:
-```python
-import os, shutil
+✅ Short and concise
+✅ Includes all major explanations
+❌ Does not include recommendations (as you requested)
+✅ Includes all required code blocks
+✅ Professional tone and formatting
 
-RAW_DIR = "/content/drive/MyDrive/company-ingest/raw"
-BATCH_ROOT = "/content/drive/MyDrive/company-ingest/batches"
-os.makedirs(BATCH_ROOT, exist_ok=True)
 
-all_pdfs = []
-for root, _, files in os.walk(RAW_DIR):
-    for f in files:
-        if f.lower().endswith(".pdf"):
-            all_pdfs.append(os.path.join(root, f))
+---
 
-all_pdfs.sort()
-batches = 4
-for idx, path in enumerate(all_pdfs):
-    b = idx % batches
-    target_dir = os.path.join(BATCH_ROOT, f"batch-{b}")
-    os.makedirs(target_dir, exist_ok=True)
-    rel = os.path.relpath(path, RAW_DIR)
-    dst = os.path.join(target_dir, rel)
-    os.makedirs(os.path.dirname(dst), exist_ok=True)
-    shutil.copy2(path, dst)
-```
-Each Colab notebook points its SOURCE_DIR to a specific batch-n folder, and writes cleaned PDFs to a shared CLEAN_DIR.
+📄 OCR Preprocessing & Batch Processing Pipeline
+
+This repository contains a complete OCR preprocessing workflow designed for large-scale PDF processing.
+It supports:
+
+Page-level image preprocessing (denoise, auto-orientation, downscale)
+
+OCR quality analysis (blur, contrast, character count)
+
+PDF-to-image conversion using Poppler
+
+Tesseract-based orientation detection and OCR scoring
+
+Automatic batching, zipping, and cleanup
+
+Distributed multi-account/multi-worker processing with batch JSON files
+
+Persistent logging (progress tracker, error logs, quality metrics)
+
+
+This pipeline is optimized for long-running Google Colab sessions with Google Drive persistence.
+
+
+---
+
+📁 Directory Structure
+
+OCR_Pipeline/
+│
+├── ocr_script.ipynb / ocr_script.py       # Main pipeline
+├── Logs/
+│   ├── progress_tracker.json              # Tracks processed files
+│   ├── error_log.txt                      # Detailed error traces
+│   └── pdf_quality_metrics.csv            # OCR quality metrics
+└── batch_splitter.py                      # Multi-worker batch generator
+
+
+---
+
+🚀 Main OCR Pipeline
+
+Below is the full annotated code used for:
+
+PDF → image conversion
+
+Per-page preprocessing
+
+OCR scoring
+
+Saving processed PDFs
+
+Batch zipping & cleanup
+
+Progress tracking
+
+
+
+---
+
+📦 Install & Setup
+
+!apt-get install poppler-utils
+!pip install pdf2image==1.16.3 pytesseract numpy pandas pillow opencv-python matplotlib scikit-image
+
+Mount Google Drive:
+
+from google.colab import drive
+drive.mount('/content/drive')
+
+
+---
+
+⚙️ Configuration
+
+import os, gc, json, time, numpy as np, pandas as pd, traceback
+import cv2
+from pdf2image import convert_from_path
+import pytesseract
+from pytesseract import Output
+from PIL import Image
+import imutils
+import matplotlib.pyplot as plt
+from google.colab import files
+
+PDF_FOLDER = "/content/drive/MyDrive"
+TEMP_IMAGE_FOLDER = "/content/temp_images"
+OUTPUT_FOLDER = "/content/OCR_Output"
+LOGS_DIR = "/content/drive/MyDrive/OCR_Pipeline/Logs"
+
+os.makedirs(TEMP_IMAGE_FOLDER, exist_ok=True)
+os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+os.makedirs(LOGS_DIR, exist_ok=True)
+
+TRACKER_FILE = os.path.join(LOGS_DIR, "progress_tracker.json")
+ERROR_LOG_FILE = os.path.join(LOGS_DIR, "error_log.txt")
+METRICS_CSV = os.path.join(LOGS_DIR, "pdf_quality_metrics.csv")
+
+DPI = 200
+ZIP_BATCH_SIZE = 500
+
+
+---
+
+📘 Progress Tracker & Logging
+
+def load_tracker():
+    if os.path.exists(TRACKER_FILE):
+        with open(TRACKER_FILE, "r") as f:
+            return json.load(f)
+    return {"processed": []}
+
+def save_tracker(data):
+    with open(TRACKER_FILE, "w") as f:
+        json.dump(data, f, indent=2)
+
+def log_error(pdf_path, page_num, error):
+    with open(ERROR_LOG_FILE, "a") as f:
+        f.write(f"\n\n--- ERROR in {pdf_path} PAGE {page_num} ---\n")
+        f.write(error)
+        f.write("\n------------------------------\n")
+
+
+---
+
+🖼 Image Preprocessing Helpers
+
+def denoise_image(image):
+    return cv2.fastNlMeansDenoisingColored(image, None, 10, 10, 7, 21)
+
+def orientation_fix(image):
+    try:
+        osd = pytesseract.image_to_osd(image)
+        angle = int([x for x in osd.split() if x.isdigit()][0])
+        return imutils.rotate_bound(image, angle)
+    except:
+        txt_normal = len(pytesseract.image_to_string(image).strip())
+        flipped = cv2.rotate(image, cv2.ROTATE_180)
+        txt_flipped = len(pytesseract.image_to_string(flipped).strip())
+        return flipped if txt_flipped > txt_normal else image
+
+def preprocess_image(image):
+    if max(image.shape) > 8000:
+        scale = 8000 / max(image.shape)
+        image = cv2.resize(image, None, fx=scale, fy=scale)
+
+    denoised = denoise_image(image)
+    oriented = orientation_fix(denoised)
+    return denoised, oriented
+
+def save_pdf(images, output_pdf):
+    pil_images = [Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB)) for img in images]
+    pil_images[0].save(output_pdf, save_all=True, append_images=pil_images[1:])
+
+
+---
+
+🔬 Core Processing Function
+
+def analyze_and_preprocess_pdf(pdf_path):
+    metrics = {"PDF": pdf_path, "Status": "Success", "Failed_Pages": ""}
+
+    try:
+        images = convert_from_path(pdf_path, dpi=DPI)
+    except:
+        metrics["Status"] = "Failed"
+        return metrics, None
+
+    preprocessed = []
+    blur_vals, contrast_vals, char_vals = [], [], []
+    failed_pages = []
+
+    for i, page in enumerate(images, 1):
+        try:
+            img = cv2.cvtColor(np.array(page), cv2.COLOR_RGB2BGR)
+            _, processed = preprocess_image(img)
+
+            preprocessed.append(processed)
+
+            gray = cv2.cvtColor(processed, cv2.COLOR_BGR2GRAY)
+            blur_vals.append(cv2.Laplacian(gray, cv2.CV_64F).var())
+            contrast_vals.append(np.std(gray))
+            char_vals.append(len(pytesseract.image_to_string(processed).strip()))
+        except Exception as e:
+            failed_pages.append(i)
+            log_error(pdf_path, i, traceback.format_exc())
+
+    metrics.update({
+        "Num_Pages": len(images),
+        "Avg_Blur": np.mean(blur_vals) if blur_vals else 0,
+        "Avg_Contrast": np.mean(contrast_vals) if contrast_vals else 0,
+        "Avg_CharCount": np.mean(char_vals) if char_vals else 0,
+        "Failed_Pages": failed_pages,
+        "Status": "Failed" if failed_pages else "Success"
+    })
+
+    return metrics, preprocessed
+
+
+---
+
+▶ Main Execution Loop
+
+tracker = load_tracker()
+metrics_df = pd.read_csv(METRICS_CSV) if os.path.exists(METRICS_CSV) else pd.DataFrame()
+
+all_pdfs = [
+    os.path.join(PDF_FOLDER, f) for f in os.listdir(PDF_FOLDER)
+    if f.lower().endswith(".pdf")
+]
+
+batch_counter = 0
+
+for pdf_path in all_pdfs:
+    file_name = os.path.basename(pdf_path)
+
+    if file_name in tracker["processed"]:
+        continue
+
+    metrics, images = analyze_and_preprocess_pdf(pdf_path)
+    metrics_df = pd.concat([metrics_df, pd.DataFrame([metrics])], ignore_index=True)
+
+    if images:
+        save_pdf(images, os.path.join(OUTPUT_FOLDER, file_name))
+        batch_counter += 1
+
+    tracker["processed"].append(file_name)
+    save_tracker(tracker)
+    metrics_df.to_csv(METRICS_CSV, index=False)
+
+    if batch_counter >= ZIP_BATCH_SIZE or pdf_path == all_pdfs[-1]:
+        zip_name = f"OCR_Batch_{int(time.time())}.zip"
+        os.system(f"zip -r {zip_name} {OUTPUT_FOLDER}")
+        files.download(zip_name)
+
+        time.sleep(np.random.randint(900, 1200))
+        os.system(f"rm -rf {OUTPUT_FOLDER}")
+        os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+        batch_counter = 0
+
+
+---
+
+🔁 Multi-Worker Batch Splitter
+
+Use this script to divide unprocessed PDFs across multiple accounts.
+
+import os, json, math
+
+PDF_FOLDER = "/content/drive/MyDrive"
+LOGS_DIR = "/content/drive/MyDrive/OCR_Pipeline/Logs"
+TRACKER_FILE = os.path.join(LOGS_DIR, "progress_tracker.json")
+
+with open(TRACKER_FILE, "r") as f:
+    tracker = json.load(f)
+
+processed = set(tracker.get("processed", []))
+all_pdfs = [f for f in os.listdir(PDF_FOLDER) if f.lower().endswith(".pdf")]
+remaining = [f for f in all_pdfs if f not in processed]
+
+num_accounts = 4
+batch_size = math.ceil(len(remaining) / num_accounts)
+
+batches = [
+    remaining[i:i+batch_size] for i in range(0, len(remaining), batch_size)
+]
+
+for i, batch in enumerate(batches, 1):
+    with open(os.path.join(LOGS_DIR, f"batch_{i}.json"), "w") as f:
+        json.dump(batch, f, indent=2)
+
 
 ***
 
