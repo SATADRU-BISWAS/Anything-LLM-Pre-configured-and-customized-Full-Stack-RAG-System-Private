@@ -730,6 +730,8 @@ This pipeline is optimized for long-running Google Colab sessions with Google Dr
 
 📁 Directory Structure
 
+
+```
 OCR_Pipeline/
 │
 ├── ocr_script.ipynb / ocr_script.py       # Main pipeline
@@ -739,6 +741,8 @@ OCR_Pipeline/
 │   └── pdf_quality_metrics.csv            # OCR quality metrics
 └── batch_splitter.py                      # Multi-worker batch generator
 
+
+```
 
 ---
 
@@ -764,6 +768,8 @@ Progress tracking
 
 📦 Install & Setup
 
+
+```
 !apt-get install poppler-utils
 !pip install pdf2image==1.16.3 pytesseract numpy pandas pillow opencv-python matplotlib scikit-image
 
@@ -772,11 +778,12 @@ Mount Google Drive:
 from google.colab import drive
 drive.mount('/content/drive')
 
-
+```
 ---
 
 ⚙️ Configuration
 
+```
 import os, gc, json, time, numpy as np, pandas as pd, traceback
 import cv2
 from pdf2image import convert_from_path
@@ -803,11 +810,12 @@ METRICS_CSV = os.path.join(LOGS_DIR, "pdf_quality_metrics.csv")
 DPI = 200
 ZIP_BATCH_SIZE = 500
 
-
+```
 ---
 
 📘 Progress Tracker & Logging
 
+```
 def load_tracker():
     if os.path.exists(TRACKER_FILE):
         with open(TRACKER_FILE, "r") as f:
@@ -824,10 +832,12 @@ def log_error(pdf_path, page_num, error):
         f.write(error)
         f.write("\n------------------------------\n")
 
-
+```
 ---
 
 🖼 Image Preprocessing Helpers
+
+```
 
 def denoise_image(image):
     return cv2.fastNlMeansDenoisingColored(image, None, 10, 10, 7, 21)
@@ -856,11 +866,12 @@ def save_pdf(images, output_pdf):
     pil_images = [Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB)) for img in images]
     pil_images[0].save(output_pdf, save_all=True, append_images=pil_images[1:])
 
-
+```
 ---
 
 🔬 Core Processing Function
 
+```
 def analyze_and_preprocess_pdf(pdf_path):
     metrics = {"PDF": pdf_path, "Status": "Success", "Failed_Pages": ""}
 
@@ -899,12 +910,14 @@ def analyze_and_preprocess_pdf(pdf_path):
     })
 
     return metrics, preprocessed
-
+```
 
 ---
 
 ▶ Main Execution Loop
 
+
+```
 tracker = load_tracker()
 metrics_df = pd.read_csv(METRICS_CSV) if os.path.exists(METRICS_CSV) else pd.DataFrame()
 
@@ -943,11 +956,13 @@ for pdf_path in all_pdfs:
         batch_counter = 0
 
 
+```
 ---
 
 🔁 Multi-Worker Batch Splitter
 
 Use this script to divide unprocessed PDFs across multiple accounts.
+```
 
 import os, json, math
 
@@ -974,6 +989,7 @@ for i, batch in enumerate(batches, 1):
         json.dump(batch, f, indent=2)
 
 
+```
 ***
 
 ## Automated dumping to client folder
@@ -1076,65 +1092,9 @@ def route_failure(path):
 
 - Manual GUI upload:
   - Open AnythingLLM, select the workspace, and use the Documents UI to add the large PDF directly. [3]
-
 ***
 
-## Continuous embedding agent (next step)
-
-The next step is to build an Agent that monitors cloud storage for new files and triggers automatic embedding into AnythingLLM. This can be realized with a lightweight scheduler plus the AnythingLLM API. [3][7]
-
-- Example Python watcher (Drive-to-AnythingLLM):
-```python
-import time
-from datetime import datetime, timedelta
-
-POLL_SECONDS = 60
-
-def list_new_drive_files(since_dt):
-    # TODO: Implement Drive API list with modifiedTime > since_dt
-    return []
-
-def embed_new_files(file_list):
-    for f in file_list:
-        # Download to local staging, then call upload_doc(...)
-        pass
-
-def run_agent():
-    last_check = datetime.utcnow() - timedelta(minutes=5)
-    while True:
-        new_files = list_new_drive_files(last_check)
-        embed_new_files(new_files)
-        last_check = datetime.utcnow()
-        time.sleep(POLL_SECONDS)
-
-if __name__ == "__main__":
-    run_agent()
-```
-Tie this into webhooks or Cloud Functions for near-real-time triggers as your governance allows. [3]
-
-***
-
-## Local LanceDB embedding example
-
-If you maintain a parallel LanceDB store (for analytics or validation), this snippet shows how to generate embeddings with Nomic Embed Text via Ollama + LanceDB’s registry. [4]
-
-```python
-import lancedb
-from lancedb.pydantic import LanceModel, Vector
-from lancedb.embeddings import get_registry
-
-db = lancedb.connect("C:/rag/lance")
-func = get_registry().get("ollama").create(name="nomic-embed-text")  # default model name
-class Doc(LanceModel):
-    text: str = func.SourceField()
-    vector: Vector(func.ndims()) = func.VectorField()
-
-table = db.create_table("docs", schema=Doc, mode="create")
-table.add([{"text": "Example cleaned content"}])
-res = table.search("query about example").limit(1).to_pydantic(Doc)[0]
-print(res.text)
-```
-Adjust to your infra and indexing strategy. [4]
+## [4]
 
 ***
 
