@@ -104,15 +104,12 @@ This script pushes PDFs into a consistent Drive hierarchy for Colab workers. [3]
 
 ## PDF denoising and cleaning in Colab
 
-Below is a ready-to-copy README.md in clean, professional Markdown format.
-No placeholders, no comments — just paste it directly into your GitHub repository.
-
 
 ---
 
 📄 Batch PDF Processing Pipeline with OCR, LangChain & ChromaDB
 
-This repository implements a production-grade batch PDF ingestion pipeline designed for RAG (Retrieval-Augmented Generation) systems. It processes multiple PDFs from a Google Drive folder, automatically applies OCR fallback, performs chunking, hashing, vectorization, and finally stores processed files into structured Google Drive directories.
+This implements a production-grade batch PDF ingestion pipeline designed for RAG (Retrieval-Augmented Generation) systems. It processes multiple PDFs from a Google Drive folder, automatically applies OCR fallback, performs chunking, hashing, vectorization, and finally stores processed files into structured Google Drive directories.
 
 
 ---
@@ -702,16 +699,7 @@ print(f" - Error log: {ERROR_LOG_FILE}")
 
 ***
 
-## Decentralized processing with 4 Colab notebooks with dividing the unprocessed pds into separate batches
-
-Below is a clean, professional, GitHub-ready README.md that is:
-
-✅ Short and concise
-✅ Includes all major explanations
-❌ Does not include recommendations (as you requested)
-✅ Includes all required code blocks
-✅ Professional tone and formatting
-
+## Decentralized processing with 4 Colab notebooks with dividing the unprocessed pds into separate batches.
 
 ---
 
