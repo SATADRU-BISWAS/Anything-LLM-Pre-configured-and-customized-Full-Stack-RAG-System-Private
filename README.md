@@ -992,20 +992,251 @@ for i, batch in enumerate(batches, 1):
 ```
 ***
 
-## Automated dumping to client folder
+## Automated file upload to Anything LLM using REST API from designated client document folder
 
-Once cleaned, PDFs are synchronized to a designated client folder (network share or synced local path), enabling downstream ingestion. This can be done with rclone sync from Drive to the client. [3]
 
-- Example periodic sync (PowerShell, scheduled task):
-```powershell
-param(
-  [Parameter(Mandatory=$true)][string]$RemoteName,       # e.g., "gdrive:"
-  [Parameter(Mandatory=$true)][string]$RemoteCleanPath,  # e.g., "company-ingest/clean"
-  [Parameter(Mandatory=$true)][string]$LocalCleanPath    # e.g., "D:\RAG\clean"
-)
+---
 
-rclone sync "$RemoteName$RemoteCleanPath" "$LocalCleanPath" --progress --transfers=16 --checkers=32 --drive-chunk-size=128M --delete-excluded
+
+AnythingLLM PDF Watcher – RAM-Aware, Auto-Recovery, Fault-Tolerant Uploader
+
+This project provides a production-grade file watcher that automatically uploads PDFs into AnythingLLM using its API.
+It includes RAM-aware throttling, Docker container health checks, auto-restart, batch processing, and a progress bar — ensuring reliability even with thousands of documents.
+
+Originally built to safely process large volumes of PDFs without crashing the AnythingLLM Docker container.
+
+---
+
+🚀 Features
+
+✅ Smart Uploading
+
+Automatically detects new PDFs in a folder
+
+Uploads them to a specified AnythingLLM workspace
+
+Never uploads the same file twice
+
+Logs upload history in embedded_log.json
+
+
+🧠 RAM-Aware Throttling
+
+Pauses all uploads if container RAM ≥ 80%
+
+Resumes only when RAM ≤ 65%
+
+Prevents memory pressure and unexpected crashes
+
+
+🛠 Container Auto-Healing
+
+Detects when the AnythingLLM container is down
+
+Automatically restarts it (twice if needed)
+
+Waits for stabilization
+
+Continues uploads without losing progress
+
+
+📦 Batch Processing
+
+Splits PDFs into size-based batches
+
+Ideal for huge collections (e.g., 500–20,000+ PDFs)
+
+
+📊 Clean Progress Display
+
+Shows
+
+Current batch
+
+PDF index
+
+RAM percentage
+
+
+Real-time progress bar like:
+►▸░░░░░░ 35%
+
+
+🧱 Fault Tolerance
+
+Upload attempts auto-retry (3×)
+
+Failed PDFs moved to error_jobs/
+
+Continues even if individual files fail
+
+
+
+---
+
+📁 Project Structure
+
+ ```
+anythingllm-watcher/
+│
+├── watcher.py                  # Main watcher script (RAM-aware + restart-safe)
+├── watcher_config.json         # Configuration file (paths, API, workspace)
+├── embedded_log.json           # Tracks uploaded PDFs
+├── requirements.txt            # Python dependencies
+│
+├── error_jobs/                 # PDFs that failed after retries
+│
+├── samples/                    # Sample config + sample PDF
+│   ├── sample.pdf
+│   └── sample_config.json
+│
+└── docs/                       # Architectural diagrams, notes
+    ├── architecture.png
+    └── flow_diagram.md
+
 ```
+
+---
+
+🔧 Installation
+
+1️⃣ Install Python packages
+
+```
+pip install -r requirements.txt
+
+```
+
+Your requirements.txt should contain:
+
+requests
+
+2️⃣ Configure AnythingLLM settings
+
+Edit watcher_config.json:
+```
+
+{
+  "watch_folder": "C:/Users/biswa/Downloads/Jobs",
+  "anythingllm_url": "http://localhost:3001",
+  "api_key": "YOUR_API_KEY",
+  "workspace": "reliance",
+  "max_batch_mb": 20,
+  "check_interval_sec": 60
+}
+
+```
+
+3️⃣ Enable Docker API (required for RAM monitoring)
+
+In Docker Desktop:
+
+Settings → Docker Engine
+
+Add inside JSON:
+
+
+{
+  "hosts": ["tcp://0.0.0.0:2375","npipe://"],
+  ...
+}
+
+Restart Docker Desktop.
+
+Test:
+
+Invoke-RestMethod http://localhost:2375/version
+
+
+---
+
+▶️ Running the Watcher
+
+python watcher.py
+
+You’ll see output like:
+
+👀 Watching folder: C:\Users\biswa\Downloads\Jobs
+
+🔍 Found 615 new PDF(s).
+📦 Total batches to process: 32
+
+📦 Processing batch 1/32 (20 PDF(s))...
+➡️ [1/20] ATC-1 Scanned.pdf
+🧠 RAM: 32.1%
+⬆️ Uploading...
+✔ Uploaded OK
+
+
+---
+
+📉 What Happens During High RAM Usage?
+
+If RAM hits ≥ 80%, you’ll see:
+
+⛔ RAM too high (82.4%). Pausing until ≤ 65%...
+🔍 RAM check: 78%
+🔍 RAM check: 69%
+🔍 RAM check: 64%
+✅ RAM safe again. Resuming uploads.
+
+
+---
+
+🩹 Container Crash Recovery
+
+If AnythingLLM container crashes:
+
+⛔ Container is DOWN. Attempting restart…
+♻️ Restart 1/2...
+✔ Restarted successfully
+⏳ Waiting 30s before RAM check...
+🧠 RAM: 55% → Safe to resume.
+
+If restart fails twice → script continues checking every 60 seconds.
+
+
+---
+
+🔥 Upload Failures
+
+If upload fails 3×:
+
+File moves to error_jobs/
+
+Logged as:
+
+
+"FAILED - 2025-02-03 06:12:45"
+
+
+---
+
+📝 Logging
+
+✔ Successful upload
+
+Added to embedded_log.json:
+
+"C:\\path\\to\\file.pdf" : "2025-02-03 12:33:12"
+
+✔ Failed upload
+
+Stored as:
+
+"C:\\path\\to\\file.pdf" : "FAILED-2025-02-03 12:33:12"
+
+
+---
+
+⭐ If you use this script in production
+
+Add a star 🌟 on GitHub and share your improvements!
+
+
+---
+
+If you want, I can generate the actual requirements.txt, sample_config.json, or docs/architecture diagram.
 
 ***
 
