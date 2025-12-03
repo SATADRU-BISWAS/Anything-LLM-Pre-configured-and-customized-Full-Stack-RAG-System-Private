@@ -1128,18 +1128,34 @@ Edit watcher_config.json:
 ```
 
 3️⃣ Enable Docker API (required for RAM monitoring)
+    Enabling Docker RAM Monitoring (Required)
 
-In Docker Desktop:
+    Your watcher uses the Docker Engine API to read memory usage:
 
-Settings → Docker Engine
+     http://localhost:2375/containers/anythingllm/stats?stream=false
 
-Add inside JSON:
+     To enable this, you must activate Docker’s TCP port (2375).
+
+     ✔ Activate Docker Engine API (GUI — Recommended)
+
+1. Open Docker Desktop
 
 
-{
-  "hosts": ["tcp://0.0.0.0:2375","npipe://"],
-  ...
-}
+2. Go to Settings → General
+
+
+3. Scroll down to:
+
+☑ Expose daemon on tcp://localhost:2375 without TLS
+
+
+4. Enable it
+
+
+5. Click Apply & Restart
+
+
+✔ Verify:
 
 Restart Docker Desktop.
 
@@ -1147,12 +1163,21 @@ Test:
 
 Invoke-RestMethod http://localhost:2375/version
 
+If you see JSON output → RAM monitoring is working.   
+
+
+
 
 ---
 
 ▶️ Running the Watcher
 
+
+1.Navigate to the designated folder that contains python script below:
+
 python watcher.py
+
+2. Then simply execute the script "python watcher.py" by entering "python watcher.py" and pressing Enter "⏎" on keyboard
 
 You’ll see output like:
 
@@ -1229,14 +1254,10 @@ Stored as:
 
 ---
 
-⭐ If you use this script in production
-
-Add a star 🌟 on GitHub and share your improvements!
 
 
 ---
 
-If you want, I can generate the actual requirements.txt, sample_config.json, or docs/architecture diagram.
 
 ***
 
@@ -1250,6 +1271,8 @@ The Docker edition was chosen for multi-platform integration, easier backups, an
   - Full REST API for programmatic embedding and chat. [3][7]
 
 Place a screenshot of the workspace and API key setup here (e.g., /docs/anythingllm_api.png). [3]
+
+
 
 ***
 
@@ -1325,15 +1348,462 @@ def route_failure(path):
   - Open AnythingLLM, select the workspace, and use the Documents UI to add the large PDF directly. [3]
 ***
 
-## [4]
+## [4] Complete REST Ingestion code
 
-***
+Pasted below is the complete the code block for python watcher.py:-
 
-## Operational tips
+```
+#!/usr/bin/env python3
 
-- Use 4 Colab notebooks for balanced throughput; pin each to a batch-n folder.  
-- Keep a rolling log of ingestion outcomes; route oversized failures immediately for manual GUI ingestion. [3]
-- Back up AnythingLLM storage and LanceDB directories regularly; prefer bind mounts in Docker. [2]
+import os
+import sys
+import time
+import json
+import math
+import shutil
+import requests
+from pathlib import Path
 
+CONFIG_PATH = "watcher_config.json"
+LOG_PATH = "embedded_log.json"
+
+# -------------------------------------------------------------
+# Load configuration
+# -------------------------------------------------------------
+with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+    cfg = json.load(f)
+
+WATCH_FOLDER = Path(cfg["watch_folder"])
+API_URL = cfg["anythingllm_url"].rstrip("/")
+API_KEY = cfg["api_key"]
+WORKSPACE = cfg["workspace"]  # workspace slug
+MAX_BATCH_MB = cfg.get("max_batch_mb", 20)
+CHECK_INTERVAL = cfg.get("check_interval_sec", 60)
+
+HEADERS = {"Authorization": f"Bearer {API_KEY}"}
+
+# -------------------------------------------------------------
+# Docker / RAM settings
+# -------------------------------------------------------------
+DOCKER_API = "http://localhost:2375"
+CONTAINER = "anythingllm"
+
+RAM_PAUSE = 80.0    # pause when RAM >= 80%
+RAM_RESUME = 65.0   # resume when RAM <= 65%
+
+RESTART_WAIT = 30   # seconds to wait after each restart
+RETRY_DELAY = 120   # seconds between upload retries
+UPLOAD_TIMEOUT = 60 # per attempt HTTP timeout
+MAX_RETRIES = 3
+
+# Error folder
+ERROR_FOLDER = Path(r"C:\Users\biswa\Downloads\error jobs")
+ERROR_FOLDER.mkdir(parents=True, exist_ok=True)
+
+
+# -------------------------------------------------------------
+# Progress bar helpers
+# -------------------------------------------------------------
+def update_progress_bar(done, total, batch_idx, batch_total, current_pdf, ram=None, waiting=False):
+    """
+    Render a simple single-line progress bar in the terminal.
+    """
+    if total <= 0:
+        total = 1
+    pct = (done / total) * 100.0
+
+    bar_len = 20
+    filled_len = int(bar_len * pct / 100.0)
+    bar = "█" * filled_len + "-" * (bar_len - filled_len)
+
+    status = "WAITING" if waiting else "RUNNING"
+    ram_text = f" | RAM: {ram}%" if ram is not None else ""
+
+    msg = (
+        f"\r[{bar}] {pct:5.1f}% ({done}/{total} PDFs)"
+        f" | Batch {batch_idx}/{batch_total}"
+        f" | {status}"
+        f" | Current: {current_pdf}{ram_text}   "
+    )
+
+    sys.stdout.write(msg)
+    sys.stdout.flush()
+
+
+def clear_progress_bar():
+    sys.stdout.write("\r" + " " * 140 + "\r")
+    sys.stdout.flush()
+
+
+# -------------------------------------------------------------
+# Logging Helpers
+# -------------------------------------------------------------
+def load_log():
+    if Path(LOG_PATH).exists():
+        with open(LOG_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+
+def save_log(log):
+    with open(LOG_PATH, "w", encoding="utf-8") as f:
+        json.dump(log, f, indent=2)
+
+
+# -------------------------------------------------------------
+# Error Handling
+# -------------------------------------------------------------
+def move_to_error(pdf, reason="Unknown error"):
+    try:
+        target = ERROR_FOLDER / pdf.name
+        shutil.move(str(pdf), str(target))
+        print(f"\n🚫 ERROR → {pdf.name} moved to error folder ({reason})")
+    except Exception as e:
+        print(f"\n⚠️ Failed to move {pdf.name} to error folder: {e}")
+
+
+# -------------------------------------------------------------
+# Docker Container Helpers
+# -------------------------------------------------------------
+def is_container_running():
+    try:
+        r = requests.get(f"{DOCKER_API}/containers/{CONTAINER}/json", timeout=5)
+        if r.status_code != 200:
+            print(f"⚠️ Container inspect HTTP {r.status_code}")
+            return False
+        state = r.json().get("State", {})
+        return bool(state.get("Running", False))
+    except Exception as e:
+        print(f"⚠️ Container check error: {e}")
+        return False
+
+
+def restart_container_twice():
+    print("\n⛔ Container is NOT running. Performing double restart for safety...")
+    for i in range(2):
+        try:
+            print(f"♻️ Restart {i+1}/2...")
+            r = requests.post(
+                f"{DOCKER_API}/containers/{CONTAINER}/restart",
+                timeout=10
+            )
+            if r.status_code not in (200, 204):
+                print(f"⚠️ Restart {i+1} HTTP {r.status_code}")
+        except Exception as e:
+            print(f"❌ Restart {i+1} failed: {e}")
+        print(f"⏳ Waiting {RESTART_WAIT} seconds after restart {i+1}...")
+        time.sleep(RESTART_WAIT)
+    print("✅ Double restart complete.")
+
+
+# -------------------------------------------------------------
+# RAM Monitoring
+# -------------------------------------------------------------
+def get_ram_usage():
+    try:
+        r = requests.get(
+            f"{DOCKER_API}/containers/{CONTAINER}/stats?stream=false",
+            timeout=5
+        )
+        if r.status_code != 200:
+            print(f"⚠️ RAM stats HTTP {r.status_code}")
+            return None
+        js = r.json()
+        used = js["memory_stats"]["usage"]
+        limit = js["memory_stats"]["limit"]
+        if not limit:
+            return None
+        pct = used / limit * 100.0
+        return round(pct, 2)
+    except Exception as e:
+        print(f"⚠️ RAM check error: {e}")
+        return None
+
+
+def wait_for_safe_ram(global_done=0, global_total=1, batch_idx=0, batch_total=1, label="RAM WAIT"):
+    """
+    Enforce:
+      - pause uploads when RAM >= RAM_PAUSE
+      - resume when RAM <= RAM_RESUME
+    Also ensures the container is running (double restart if needed).
+    """
+    # Ensure container is alive first
+    if not is_container_running():
+        restart_container_twice()
+
+    while True:
+        ram = get_ram_usage()
+        if ram is None:
+            print("⚠️ Could not read RAM usage, retrying in 5s...")
+            time.sleep(5)
+            continue
+
+        update_progress_bar(
+            global_done,
+            global_total,
+            batch_idx,
+            batch_total,
+            current_pdf=label,
+            ram=ram,
+            waiting=(ram >= RAM_PAUSE),
+        )
+
+        if ram < RAM_PAUSE:
+            # clear line once we are safe again
+            clear_progress_bar()
+            return
+
+        print(f"\n⛔ RAM too high ({ram}% ≥ {RAM_PAUSE}%). Waiting for ≤ {RAM_RESUME}%...")
+
+        # Inner loop: stay here until RAM safe
+        while True:
+            if not is_container_running():
+                print("⛔ Container stopped while waiting on RAM. Restarting twice...")
+                restart_container_twice()
+
+            ram2 = get_ram_usage()
+            if ram2 is None:
+                time.sleep(5)
+                continue
+
+            update_progress_bar(
+                global_done,
+                global_total,
+                batch_idx,
+                batch_total,
+                current_pdf=label,
+                ram=ram2,
+                waiting=True,
+            )
+
+            if ram2 <= RAM_RESUME:
+                print(f"\n✅ RAM safe again ({ram2}% ≤ {RAM_RESUME}%). Resuming uploads.")
+                clear_progress_bar()
+                return
+
+            time.sleep(5)
+
+
+# -------------------------------------------------------------
+# Upload-only logic (Option A, no embedding verification)
+# -------------------------------------------------------------
+def upload_pdf(pdf_path, global_done, global_total, batch_idx, batch_total):
+
+    def attempt_upload():
+        # Ensure RAM + container OK before starting
+        wait_for_safe_ram(
+            global_done=global_done,
+            global_total=global_total,
+            batch_idx=batch_idx,
+            batch_total=batch_total,
+            label=f"Uploading {pdf_path.name}",
+        )
+
+        ram = get_ram_usage()
+        update_progress_bar(
+            global_done,
+            global_total,
+            batch_idx,
+            batch_total,
+            current_pdf=f"Uploading {pdf_path.name}",
+            ram=ram,
+            waiting=False,
+        )
+
+        files = {
+            "file": (pdf_path.name, open(pdf_path, "rb"), "application/pdf"),
+        }
+        data = {
+            "addToWorkspaces": WORKSPACE,
+            "metadata": json.dumps({
+                "title": pdf_path.stem,
+                "docAuthor": "AutoUploader",
+                "description": "Uploaded automatically via watcher script",
+                "docSource": str(pdf_path),
+            }),
+        }
+        url = f"{API_URL}/api/v1/document/upload"
+
+        try:
+            response = requests.post(
+                url,
+                files=files,
+                data=data,
+                headers=HEADERS,
+                timeout=UPLOAD_TIMEOUT,
+            )
+            return response
+        finally:
+            try:
+                files["file"][1].close()
+            except Exception:
+                pass
+
+    print(f"\n⬆️ Uploading: {pdf_path.name}")
+
+    # Retry logic
+    for attempt in range(1, MAX_RETRIES + 1):
+        # Container health check each attempt
+        if not is_container_running():
+            print("⛔ Container is down before upload attempt. Restarting twice...")
+            restart_container_twice()
+
+        try:
+            response = attempt_upload()
+            break
+        except Exception as e:
+            clear_progress_bar()
+            print(f"⚠️ Upload attempt {attempt}/{MAX_RETRIES} failed for {pdf_path.name}: {e}")
+            if attempt < MAX_RETRIES:
+                print(f"⏳ Waiting {RETRY_DELAY}s before retry...")
+                time.sleep(RETRY_DELAY)
+    else:
+        move_to_error(pdf_path, "Upload failed after retries")
+        return False
+
+    # Validate response JSON
+    try:
+        res_json = response.json()
+    except Exception:
+        clear_progress_bar()
+        print(f"❌ Invalid JSON response: {response.text[:500]}")
+        move_to_error(pdf_path, "Invalid JSON response")
+        return False
+
+    if response.status_code != 200 or not res_json.get("success"):
+        clear_progress_bar()
+        print(
+            f"❌ Upload API failure for {pdf_path.name} "
+            f"(HTTP {response.status_code}, success={res_json.get('success')})"
+        )
+        move_to_error(pdf_path, f"API error {response.status_code}")
+        return False
+
+    clear_progress_bar()
+    print(f"✅ Uploaded OK (embedding will happen internally): {pdf_path.name}")
+    return True
+
+
+# -------------------------------------------------------------
+# Batching logic
+# -------------------------------------------------------------
+def batch_pdfs(pdfs):
+    """
+    Yield lists of PDFs whose total size is <= MAX_BATCH_MB.
+    """
+    batch, total_mb = [], 0.0
+    for pdf in pdfs:
+        size_mb = pdf.stat().st_size / (1024 * 1024)
+        if total_mb + size_mb > MAX_BATCH_MB and batch:
+            yield batch
+            batch, total_mb = [], 0.0
+        batch.append(pdf)
+        total_mb += size_mb
+    if batch:
+        yield batch
+
+
+# -------------------------------------------------------------
+# Pending PDFs based on log
+# -------------------------------------------------------------
+def get_pending_pdfs():
+    log = load_log()
+    all_pdfs = sorted(WATCH_FOLDER.glob("*.pdf"))
+    return [p for p in all_pdfs if str(p) not in log]
+
+
+# -------------------------------------------------------------
+# File stability check
+# -------------------------------------------------------------
+def is_file_stable(path: Path, wait: int = 2) -> bool:
+    """
+    Returns True if the file size is unchanged over 'wait' seconds.
+    Helps avoid partially copied files.
+    """
+    try:
+        size1 = path.stat().st_size
+        time.sleep(wait)
+        size2 = path.stat().st_size
+        return size1 == size2
+    except FileNotFoundError:
+        return False
+
+
+# -------------------------------------------------------------
+# Main Watcher Loop
+# -------------------------------------------------------------
+def main():
+    print(f"👀 Watching folder: {WATCH_FOLDER}")
+    log = load_log()
+
+    while True:
+        pending = get_pending_pdfs()
+
+        if pending:
+            total_pdfs = len(pending)
+            print(f"\n🔍 Found {total_pdfs} new PDF(s).")
+
+            batches = list(batch_pdfs(pending))
+            total_batches = len(batches)
+            print(f"📦 Total batches to process: {total_batches}")
+
+            processed_count = 0
+
+            for batch_idx, batch in enumerate(batches, start=1):
+                print(
+                    f"\n📦 Processing batch {batch_idx}/{total_batches} "
+                    f"({len(batch)} PDF(s))..."
+                )
+
+                for pdf in batch:
+                    processed_count_display = processed_count  # before this PDF
+
+                    # Show pre-upload progress bar
+                    update_progress_bar(
+                        done=processed_count_display,
+                        total=total_pdfs,
+                        batch_idx=batch_idx,
+                        batch_total=total_batches,
+                        current_pdf=pdf.name,
+                        ram=get_ram_usage(),
+                        waiting=False,
+                    )
+
+                    # Ensure file is stable
+                    if not is_file_stable(pdf):
+                        clear_progress_bar()
+                        print(f"⚠️ File not stable yet, retrying in 5s: {pdf.name}")
+                        time.sleep(5)
+                        if not is_file_stable(pdf):
+                            print(f"❌ File still unstable, skipping for now: {pdf.name}")
+                            continue
+
+                    success = upload_pdf(
+                        pdf,
+                        global_done=processed_count_display,
+                        global_total=total_pdfs,
+                        batch_idx=batch_idx,
+                        batch_total=total_batches,
+                    )
+
+                    processed_count += 1
+
+                    # Update log
+                    ts = time.strftime("%Y-%m-%d %H:%M:%S")
+                    log[str(pdf)] = ts if success else f"FAILED - {ts}"
+                    save_log(log)
+
+                    clear_progress_bar()
+
+            print("\n✅ All pending PDFs in this cycle processed.")
+        else:
+            print("⏳ No new PDFs. Sleeping...")
+            time.sleep(CHECK_INTERVAL)
+
+
+if __name__ == "__main__":
+    main()
+
+```
 ***
 
