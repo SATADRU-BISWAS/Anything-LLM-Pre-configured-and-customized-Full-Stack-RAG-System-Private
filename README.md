@@ -692,6 +692,7 @@ print("\nðŸŽ¯ Pipeline run complete. Tracker and metrics saved in Satadru Dr
 print(f" - Tracker: {TRACKER_FILE}")
 print(f" - Metrics CSV: {METRICS_CSV}")
 print(f" - Error log: {ERROR_LOG_FILE}")
+
 ```
 
 ---
@@ -993,14 +994,10 @@ for i, batch in enumerate(batches, 1):
 ***
 
 ## Automated file upload to Anything LLM using REST API from designated client document folder
-
-
 ---
-
-
 AnythingLLM PDF Watcher – RAM-Aware, Auto-Recovery, Fault-Tolerant Uploader
 
-This project provides a production-grade file watcher that automatically uploads PDFs into AnythingLLM using its API.
+This  provides a production-grade file watcher that automatically uploads PDFs into AnythingLLM using its API.
 It includes RAM-aware throttling, Docker container health checks, auto-restart, batch processing, and a progress bar — ensuring reliability even with thousands of documents.
 
 Originally built to safely process large volumes of PDFs without crashing the AnythingLLM Docker container.
@@ -1254,8 +1251,6 @@ Stored as:
 
 ---
 
-
-
 ---
 
 
@@ -1286,7 +1281,7 @@ If running via Ollama, ensure mistral and nomic-embed-text models are available 
 
 ***
 
-## REST ingestion to AnythingLLM
+## 1. REST ingestion to AnythingLLM
 
 Clean PDFs in the client folder are tunneled to AnythingLLM via REST for vector embedding, automating ingestion from the client machine into the target workspace. AnythingLLM exposes an API for managing workspaces and documents programmatically. [3][7]
 
@@ -1327,7 +1322,7 @@ Refer to AnythingLLM’s API docs for exact endpoints and auth flows. [7][3]
 
 ***
 
-## Handling large-file failures
+## [2]. Handling large-file failures
 
 Very large PDFs may fail in automated embedding. Those are routed to a designated local folder for manual upload through the AnythingLLM GUI. This hybrid flow ensures no document is blocked by API constraints. [3]
 
@@ -1348,7 +1343,7 @@ def route_failure(path):
   - Open AnythingLLM, select the workspace, and use the Documents UI to add the large PDF directly. [3]
 ***
 
-## [4] Complete REST Ingestion code
+## [3] Complete REST Ingestion code
 
 Pasted below is the complete the code block for python watcher.py:-
 
