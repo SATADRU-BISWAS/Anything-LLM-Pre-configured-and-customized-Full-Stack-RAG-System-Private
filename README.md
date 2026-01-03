@@ -159,7 +159,7 @@ This script pushes PDFs into a consistent Drive hierarchy for Colab workers. [3]
 
 ---
 
-📄 Batch PDF Processing Pipeline with OCR, LangChain & ChromaDB
+### 📄 Batch PDF Processing Pipeline with OCR, LangChain & ChromaDB
 
 This implements a production-grade batch PDF ingestion pipeline designed for RAG (Retrieval-Augmented Generation) systems. It processes multiple PDFs from a Google Drive folder, automatically applies OCR fallback, performs chunking, hashing, vectorization, and finally stores processed files into structured Google Drive directories.
 
@@ -168,7 +168,7 @@ This implements a production-grade batch PDF ingestion pipeline designed for RAG
 
 
 
-🚀 Key Features
+### 🚀 Key Features
 
 🔍 Batch PDF Detection (auto scans Drive folder for new PDFs)
 
@@ -220,7 +220,7 @@ Google Drive (Input Folder)
 
 ---
 
-📁 Google Drive Folder Structure
+### 📁 Google Drive Folder Structure
 
 ```
 
@@ -232,9 +232,9 @@ MyDrive/
 ```
 ---
 
-⚙️ How the Pipeline Works
+### ⚙️ How the Pipeline Works
 
-1️⃣ Batch PDF Detection
+#### 1️⃣ Batch PDF Detection
 
 The pipeline detects all PDFs inside the Google Drive input folder:
 
@@ -245,7 +245,7 @@ This enables large-scale automated ingestion — no manual file selection requir
 
 ---
 
-2️⃣ Per-File Processing Loop
+#### 2️⃣ Per-File Processing Loop
 
 Each PDF is processed sequentially:
 
@@ -257,7 +257,7 @@ This ensures uniform handling across clean PDFs, scanned PDFs, and mixed-content
 
 ---
 
-3️⃣ Metadata Extraction + OCR Fallback
+#### 3️⃣ Metadata Extraction + OCR Fallback
 
 The system first attempts normal PDF text extraction:
 
@@ -281,7 +281,7 @@ Pages contain only images
 
 ---
 
-4️⃣ Chunking & Hashing
+#### 4️⃣ Chunking & Hashing
 
 Extracted text is segmented into retrieval-friendly chunks:
 
@@ -303,7 +303,7 @@ Ensures ChromaDB inserts are idempotent
 
 ---
 
-5️⃣ Embeddings + ChromaDB Insert
+#### 5️⃣ Embeddings + ChromaDB Insert
 
 Text chunks are embedded using HuggingFace models (via LangChain) and stored in ChromaDB:
 
@@ -318,7 +318,7 @@ Using chunk hashes as IDs effectively eliminates duplicates.
 
 ---
 
-6️⃣ Storing Processed PDFs in Google Drive
+#### 6️⃣ Storing Processed PDFs in Google Drive
 
 After successful vectorization, the file is moved to the processed folder:
 
@@ -336,7 +336,7 @@ Easy audit trail of processed documents
 
 ---
 
-7️⃣ Handling Failures
+#### 7️⃣ Handling Failures
 
 If extraction or OCR fails:
 
@@ -347,7 +347,7 @@ Keeps faulty uploads isolated from the main ingestion flow.
 
 ---
 
-🧠 End-to-End Summary
+### 🧠 End-to-End Summary
 
 1. Load all PDFs from Drive batch folder
 
@@ -381,7 +381,7 @@ This pipeline is designed for reliability, automation, and scalability for any R
 
 ---
 
-🛠️ Tech Stack
+### 🛠️ Tech Stack
 
 Component	Technology
 
@@ -397,7 +397,7 @@ Hashing	SHA256
 
 ---
 
-📌 Ideal Use Cases
+### 📌 Ideal Use Cases
 
 Insurance document indexing
 
@@ -756,7 +756,7 @@ print(f" - Error log: {ERROR_LOG_FILE}")
 
 ---
 
-📄 OCR Preprocessing & Batch Processing Pipeline
+## 📄 OCR Preprocessing & Batch Processing Pipeline
 
 This repository contains a complete OCR preprocessing workflow designed for large-scale PDF processing.
 It supports:
@@ -781,7 +781,7 @@ This pipeline is optimized for long-running Google Colab sessions with Google Dr
 
 ---
 
-📁 Directory Structure
+### 📁 Directory Structure
 
 
 ```
@@ -799,7 +799,7 @@ OCR_Pipeline/
 
 ---
 
-🚀 Main OCR Pipeline
+### 🚀 Main OCR Pipeline
 
 Below is the full annotated code used for:
 
@@ -819,7 +819,7 @@ Progress tracking
 
 ---
 
-📦 Install & Setup
+### 📦 Install & Setup
 
 
 ```
@@ -834,7 +834,7 @@ drive.mount('/content/drive')
 ```
 ---
 
-⚙️ Configuration
+### ⚙️ Configuration
 
 ```
 import os, gc, json, time, numpy as np, pandas as pd, traceback
@@ -866,7 +866,7 @@ ZIP_BATCH_SIZE = 500
 ```
 ---
 
-📘 Progress Tracker & Logging
+### 📘 Progress Tracker & Logging
 
 ```
 def load_tracker():
@@ -888,7 +888,7 @@ def log_error(pdf_path, page_num, error):
 ```
 ---
 
-🖼 Image Preprocessing Helpers
+### 🖼 Image Preprocessing Helpers
 
 ```
 
@@ -922,7 +922,7 @@ def save_pdf(images, output_pdf):
 ```
 ---
 
-🔬 Core Processing Function
+### 🔬 Core Processing Function
 
 ```
 def analyze_and_preprocess_pdf(pdf_path):
@@ -967,7 +967,7 @@ def analyze_and_preprocess_pdf(pdf_path):
 
 ---
 
-▶ Main Execution Loop
+### ▶ Main Execution Loop
 
 
 ```
@@ -1012,7 +1012,7 @@ for pdf_path in all_pdfs:
 ```
 ---
 
-🔁 Multi-Worker Batch Splitter
+### 🔁 Multi-Worker Batch Splitter
 
 Use this script to divide unprocessed PDFs across multiple accounts.
 ```
@@ -1056,9 +1056,9 @@ Originally built to safely process large volumes of PDFs without crashing the An
 
 ---
 
-🚀 Features
+### 🚀 Features
 
-✅ Smart Uploading
+#### ✅ Smart Uploading
 
 Automatically detects new PDFs in a folder
 
@@ -1069,7 +1069,7 @@ Never uploads the same file twice
 Logs upload history in embedded_log.json
 
 
-🧠 RAM-Aware Throttling
+#### 🧠 RAM-Aware Throttling
 
 Pauses all uploads if container RAM ≥ 80%
 
@@ -1078,7 +1078,7 @@ Resumes only when RAM ≤ 65%
 Prevents memory pressure and unexpected crashes
 
 
-🛠 Container Auto-Healing
+#### 🛠 Container Auto-Healing
 
 Detects when the AnythingLLM container is down
 
@@ -1089,14 +1089,14 @@ Waits for stabilization
 Continues uploads without losing progress
 
 
-📦 Batch Processing
+#### 📦 Batch Processing
 
 Splits PDFs into size-based batches
 
 Ideal for huge collections (e.g., 500–20,000+ PDFs)
 
 
-📊 Clean Progress Display
+#### 📊 Clean Progress Display
 
 Shows
 
@@ -1111,7 +1111,7 @@ Real-time progress bar like:
 ►▸░░░░░░ 35%
 
 
-🧱 Fault Tolerance
+#### 🧱 Fault Tolerance
 
 Upload attempts auto-retry (3×)
 
@@ -1123,7 +1123,7 @@ Continues even if individual files fail
 
 ---
 
-📁 Project Structure
+### 📁 Project Structure
 
  ```
 anythingllm-watcher/
@@ -1147,9 +1147,9 @@ anythingllm-watcher/
 
 ---
 
-🔧 Installation
+### 🔧 Installation
 
-1️⃣ Install Python packages
+#### 1️⃣ Install Python packages
 
 ```
 pip install -r requirements.txt
@@ -1160,7 +1160,7 @@ Your requirements.txt should contain:
 
 requests
 
-2️⃣ Configure AnythingLLM settings
+#### 2️⃣ Configure AnythingLLM settings
 
 Edit watcher_config.json:
 ```
@@ -1176,7 +1176,7 @@ Edit watcher_config.json:
 
 ```
 
-3️⃣ Enable Docker API (required for RAM monitoring)
+#### 3️⃣ Enable Docker API (required for RAM monitoring)
     Enabling Docker RAM Monitoring (Required)
 
     Your watcher uses the Docker Engine API to read memory usage:
