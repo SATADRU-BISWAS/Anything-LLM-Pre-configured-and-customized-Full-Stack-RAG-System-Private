@@ -4,6 +4,52 @@
 
 A production-lean deployment that ingests internal PDFs, denoises them at scale in Google Colab, and automatically embeds them into AnythingLLM (Docker) using Mistral 7B, LanceDB, and Nomic Embed Text v1. The pipeline supports GUI and REST-based ingestion, fault routing for large files, and is designed for continuous embedding automation. [1][2][3]
 
+
+# Table of Contents
+
+## [1. Project Overview](#1-project-overview)
+*Internal RAG Pipeline with Distributed Colab Preprocessing and AnythingLLM*
+
+## [2. Architecture Overview](#2-architecture-overview)
+*High-level system workflow from PDF upload to RAG*
+
+## [3. Key Components](#3-key-components)
+*Core technologies and their roles*
+
+## [4. Features](#4-features)
+*Main capabilities of the system*
+
+## [5. Prerequisites](#5-prerequisites)
+*Required software, accounts, and setup*
+
+## [6. RAG System Setup](#6-rag-system-setup)
+### [6.1. Docker Quickstart](#61-docker-quickstart)
+*Sample docker-compose.yml configuration*
+
+## [7. PowerShell Uploader to Google Drive](#7-powershell-uploader-to-google-drive)
+### [7.1. Requirements](#71-requirements)
+### [7.2. Example Script](#72-example-script)
+*Rclone-based upload implementation*
+
+## [8. PDF Denoising and Cleaning in Colab](#8-pdf-denoising-and-cleaning-in-colab)
+### [8.1. Batch PDF Processing Pipeline with OCR, LangChain & ChromaDB](#81-batch-pdf-processing-pipeline-with-ocr-langchain--chromadb)
+### [8.2. 🚀 Key Features](#82--key-features)
+### [8.3. 📦 Architecture Overview](#83--architecture-overview)
+### [8.4. 📁 Google Drive Folder Structure](#84--google-drive-folder-structure)
+### [8.5. ⚙️ How the Pipeline Works](#85--how-the-pipeline-works)
+#### [8.5.1. Batch PDF Detection](#851-batch-pdf-detection)
+#### [8.5.2. Per-File Processing Loop](#852-per-file-processing-loop)
+#### [8.5.3. Metadata Extraction + OCR Fallback](#853-metadata-extraction--ocr-fallback)
+#### [8.5.4. Chunking & Hashing](#854-chunking--hashing)
+#### [8.5.5. Embeddings + ChromaDB Insert](#855-embeddings--chromadb-insert)
+#### [8.5.6. Storing Processed PDFs in Google Drive](#856-storing-processed-pdfs-in-google-drive)
+#### [8.5.7. Handling Failures](#857-handling-failures)
+### [8.6. 🧠 End-to-End Summary](#86--end-to-end-summary)
+### [8.7. 🛠️ Tech Stack](#87--tech-stack)
+### [8.8. 📌 Ideal Use Cases](#88--ideal-use-cases)
+### [8.9. Colab Notebook Implementation](#89-colab-notebook-implementation)
+*Full code implementation in Google Colab*
+
 ## Architecture overview
 
 - Source PDFs are uploaded from client machines to Google Drive via a PowerShell uploader.  
