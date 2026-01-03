@@ -3,53 +3,37 @@
 # Internal RAG Pipeline with Distributed Colab Preprocessing and AnythingLLM
 
 A production-lean deployment that ingests internal PDFs, denoises them at scale in Google Colab, and automatically embeds them into AnythingLLM (Docker) using Mistral 7B, LanceDB, and Nomic Embed Text v1. The pipeline supports GUI and REST-based ingestion, fault routing for large files, and is designed for continuous embedding automation. [1][2][3]
-
 # Table of Contents
 
-## [Internal RAG Pipeline with Distributed Colab Preprocessing and AnythingLLM](#internal-rag-pipeline-with-distributed-colab-preprocessing-and-anythingllm)
-
-## [Architecture overview](#architecture-overview)
-
-## [Key components](#key-components)
-
-## [Images](#images)
-
-## [Features](#features)
-
-## [Prerequisites](#prerequisites)
-
-## [RAG system setup](#rag-system-setup)
-
-## [PowerShell uploader to Google Drive](#powershell-uploader-to-google-drive)
-- [Requirements](#requirements)
-- [Example using rclone backend](#example-using-rclone-backend)
-
-## [PDF denoising and cleaning in Colab](#pdf-denoising-and-cleaning-in-colab)
-
-### [Batch PDF Processing Pipeline with OCR, LangChain & ChromaDB](#batch-pdf-processing-pipeline-with-ocr-langchain--chromadb)
-
-### [🚀 Key Features](#-key-features)
-
-### [📦 Architecture Overview](#-architecture-overview)
-
-### [📁 Google Drive Folder Structure](#-google-drive-folder-structure)
-
-### [⚙️ How the Pipeline Works](#️-how-the-pipeline-works)
-- [Batch PDF Detection](#1-batch-pdf-detection)
-- [Per-File Processing Loop](#2-per-file-processing-loop)
-- [Metadata Extraction + OCR Fallback](#3-metadata-extraction--ocr-fallback)
-- [Chunking & Hashing](#4-chunking--hashing)
-- [Embeddings + ChromaDB Insert](#5-embeddings--chromadb-insert)
-- [Storing Processed PDFs in Google Drive](#6-storing-processed-pdfs-in-google-drive)
-- [Handling Failures](#7-handling-failures)
-
-### [🧠 End-to-End Summary](#-end-to-end-summary)
-
-### [🛠️ Tech Stack](#️-tech-stack)
-
-### [📌 Ideal Use Cases](#-ideal-use-cases)
-
-### [Colab Notebook Code Implementation](#colab-notebook-code-implementation)
+- [GitHub - SATADRU-BISWAS/Anything-LLM-Pre-configured-and-customized-Full-Stack-RAG-System-Private](#github---satadru-biswasanything-llm-pre-configured-and-customized-full-stack-rag-system-private)
+- [Internal RAG Pipeline with Distributed Colab Preprocessing and AnythingLLM](#internal-rag-pipeline-with-distributed-colab-preprocessing-and-anythingllm)
+  - [Architecture overview](#architecture-overview)
+  - [Key components](#key-components)
+  - [Images](#images)
+  - [Features](#features)
+  - [Prerequisites](#prerequisites)
+- [RAG system setup](#rag-system-setup)
+  - [Docker quickstart (example docker-compose.yml)](#docker-quickstart-example-docker-composeyml)
+- [PowerShell uploader to Google Drive](#powershell-uploader-to-google-drive)
+  - [Requirements](#requirements)
+  - [Example using rclone backend](#example-using-rclone-backend)
+- [PDF denoising and cleaning in Colab](#pdf-denoising-and-cleaning-in-colab)
+  - [Batch PDF Processing Pipeline with OCR, LangChain & ChromaDB](#batch-pdf-processing-pipeline-with-ocr-langchain--chromadb)
+    - [🚀 Key Features](#-key-features)
+    - [📦 Architecture Overview](#-architecture-overview)
+    - [📁 Google Drive Folder Structure](#-google-drive-folder-structure)
+    - [⚙️ How the Pipeline Works](#️-how-the-pipeline-works)
+      - [1️⃣ Batch PDF Detection](#1️⃣-batch-pdf-detection)
+      - [2️⃣ Per-File Processing Loop](#2️⃣-per-file-processing-loop)
+      - [3️⃣ Metadata Extraction + OCR Fallback](#3️⃣-metadata-extraction--ocr-fallback)
+      - [4️⃣ Chunking & Hashing](#4️⃣-chunking--hashing)
+      - [5️⃣ Embeddings + ChromaDB Insert](#5️⃣-embeddings--chromadb-insert)
+      - [6️⃣ Storing Processed PDFs in Google Drive](#6️⃣-storing-processed-pdfs-in-google-drive)
+      - [7️⃣ Handling Failures](#7️⃣-handling-failures)
+    - [🧠 End-to-End Summary](#-end-to-end-summary)
+    - [🛠️ Tech Stack](#️-tech-stack)
+    - [📌 Ideal Use Cases](#-ideal-use-cases)
+    - [Colab Notebook Implementation](#colab-notebook-implementation)
 
 ## Architecture overview
 
