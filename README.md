@@ -3,9 +3,9 @@
 # Internal RAG Pipeline with Distributed Colab Preprocessing and AnythingLLM
 
 A production-lean deployment that ingests internal PDFs, denoises them at scale in Google Colab, and automatically embeds them into AnythingLLM (Docker) using Mistral 7B, LanceDB, and Nomic Embed Text v1. The pipeline supports GUI and REST-based ingestion, fault routing for large files, and is designed for continuous embedding automation. [1][2][3]
+
 # Table of Contents
 
-- [GitHub - SATADRU-BISWAS/Anything-LLM-Pre-configured-and-customized-Full-Stack-RAG-System-Private](#github---satadru-biswasanything-llm-pre-configured-and-customized-full-stack-rag-system-private)
 - [Internal RAG Pipeline with Distributed Colab Preprocessing and AnythingLLM](#internal-rag-pipeline-with-distributed-colab-preprocessing-and-anythingllm)
   - [Architecture overview](#architecture-overview)
   - [Key components](#key-components)
@@ -13,10 +13,7 @@ A production-lean deployment that ingests internal PDFs, denoises them at scale 
   - [Features](#features)
   - [Prerequisites](#prerequisites)
 - [RAG system setup](#rag-system-setup)
-  - [Docker quickstart (example docker-compose.yml)](#docker-quickstart-example-docker-composeyml)
 - [PowerShell uploader to Google Drive](#powershell-uploader-to-google-drive)
-  - [Requirements](#requirements)
-  - [Example using rclone backend](#example-using-rclone-backend)
 - [PDF denoising and cleaning in Colab](#pdf-denoising-and-cleaning-in-colab)
   - [Batch PDF Processing Pipeline with OCR, LangChain & ChromaDB](#batch-pdf-processing-pipeline-with-ocr-langchain--chromadb)
     - [🚀 Key Features](#-key-features)
@@ -33,7 +30,31 @@ A production-lean deployment that ingests internal PDFs, denoises them at scale 
     - [🧠 End-to-End Summary](#-end-to-end-summary)
     - [🛠️ Tech Stack](#️-tech-stack)
     - [📌 Ideal Use Cases](#-ideal-use-cases)
-    - [Colab Notebook Implementation](#colab-notebook-implementation)
+- [Decentralized processing with 4 Colab notebooks with dividing the unprocessed pds into separate batches](#decentralized-processing-with-4-colab-notebooks-with-dividing-the-unprocessed-pds-into-separate-batches)
+  - [📄 OCR Preprocessing & Batch Processing Pipeline](#-ocr-preprocessing--batch-processing-pipeline)
+  - [📁 Directory Structure](#-directory-structure)
+  - [🚀 Main OCR Pipeline](#-main-ocr-pipeline)
+  - [📦 Install & Setup](#-install--setup)
+  - [⚙️ Configuration](#️-configuration)
+  - [📘 Progress Tracker & Logging](#-progress-tracker--logging)
+  - [🖼 Image Preprocessing Helpers](#-image-preprocessing-helpers)
+  - [🔬 Core Processing Function](#-core-processing-function)
+  - [▶ Main Execution Loop](#-main-execution-loop)
+  - [🔁 Multi-Worker Batch Splitter](#-multi-worker-batch-splitter)
+- [Automated file upload to Anything LLM using REST API from designated client document folder](#automated-file-upload-to-anything-llm-using-rest-api-from-designated-client-document-folder)
+  - [🚀 Features](#-features-1)
+  - [📁 Project Structure](#-project-structure)
+  - [🔧 Installation](#-installation)
+  - [▶️ Running the Watcher](#️-running-the-watcher)
+  - [📉 What Happens During High RAM Usage?](#-what-happens-during-high-ram-usage)
+  - [🩹 Container Crash Recovery](#-container-crash-recovery)
+  - [🔥 Upload Failures](#-upload-failures)
+  - [📝 Logging](#-logging)
+- [AnythingLLM configuration (Docker)](#anythingllm-configuration-docker)
+- [Model and vector settings](#model-and-vector-settings)
+- [1. REST ingestion to AnythingLLM](#1-rest-ingestion-to-anythingllm)
+- [2. Handling large-file failures](#2-handling-large-file-failures)
+- [3 Complete REST Ingestion code](#3-complete-rest-ingestion-code)
 
 ## Architecture overview
 
