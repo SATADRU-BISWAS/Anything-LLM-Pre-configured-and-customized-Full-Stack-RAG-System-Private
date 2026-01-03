@@ -6,15 +6,17 @@ A production-lean deployment that ingests internal PDFs, denoises them at scale 
 
 # Table of Contents
 
+## Table of Contents
+
 - [Internal RAG Pipeline with Distributed Colab Preprocessing and AnythingLLM](#internal-rag-pipeline-with-distributed-colab-preprocessing-and-anythingllm)
-  - [Architecture overview](#architecture-overview)
-  - [Key components](#key-components)
-  - [Images](#images)
-  - [Features](#features)
-  - [Prerequisites](#prerequisites)
-- [RAG system setup](#rag-system-setup)
-- [PowerShell uploader to Google Drive](#powershell-uploader-to-google-drive)
-- [PDF denoising and cleaning in Colab](#pdf-denoising-and-cleaning-in-colab)
+- [Architecture Overview](#architecture-overview)
+- [Key Components](#key-components)
+- [Images](#images)
+- [Features](#features)
+- [Prerequisites](#prerequisites)
+- [RAG System Setup](#rag-system-setup)
+- [PowerShell Uploader to Google Drive](#powershell-uploader-to-google-drive)
+- [PDF Denoising and Cleaning in Colab](#pdf-denoising-and-cleaning-in-colab)
   - [Batch PDF Processing Pipeline with OCR, LangChain & ChromaDB](#batch-pdf-processing-pipeline-with-ocr-langchain--chromadb)
   - [Key Features](#key-features)
   - [Architecture Overview](#architecture-overview-1)
@@ -30,7 +32,7 @@ A production-lean deployment that ingests internal PDFs, denoises them at scale 
   - [End-to-End Summary](#end-to-end-summary)
   - [Tech Stack](#tech-stack)
   - [Ideal Use Cases](#ideal-use-cases)
-- [Decentralized processing with 4 Colab notebooks with dividing the unprocessed pds into separate batches](#decentralized-processing-with-4-colab-notebooks-with-dividing-the-unprocessed-pds-into-separate-batches)
+- [Decentralized Processing with 4 Colab Notebooks for Batch-Split PDFs](#decentralized-processing-with-4-colab-notebooks-for-batch-split-pdfs)
   - [OCR Preprocessing & Batch Processing Pipeline](#ocr-preprocessing--batch-processing-pipeline)
   - [Directory Structure](#directory-structure)
   - [Main OCR Pipeline](#main-ocr-pipeline)
@@ -41,7 +43,7 @@ A production-lean deployment that ingests internal PDFs, denoises them at scale 
   - [Core Processing Function](#core-processing-function)
   - [Main Execution Loop](#main-execution-loop)
   - [Multi-Worker Batch Splitter](#multi-worker-batch-splitter)
-- [Automated file upload to Anything LLM using REST API from designated client document folder](#automated-file-upload-to-anything-llm-using-rest-api-from-designated-client-document-folder)
+- [Automated File Upload to AnythingLLM Using REST API](#automated-file-upload-to-anythingllm-using-rest-api)
   - [Features](#features-1)
   - [Project Structure](#project-structure)
   - [Installation](#installation)
@@ -50,11 +52,12 @@ A production-lean deployment that ingests internal PDFs, denoises them at scale 
   - [Container Crash Recovery](#container-crash-recovery)
   - [Upload Failures](#upload-failures)
   - [Logging](#logging)
-- [AnythingLLM configuration (Docker)](#anythingllm-configuration-docker)
-- [Model and vector settings](#model-and-vector-settings)
-- [REST ingestion to AnythingLLM](#rest-ingestion-to-anythingllm)
-- [Handling large-file failures](#handling-large-file-failures)
-- [Complete REST Ingestion code](#complete-rest-ingestion-code)
+- [AnythingLLM Configuration (Docker)](#anythingllm-configuration-docker)
+- [Model and Vector Settings](#model-and-vector-settings)
+- [REST Ingestion to AnythingLLM](#rest-ingestion-to-anythingllm)
+- [Handling Large-File Failures](#handling-large-file-failures)
+- [Complete REST Ingestion Code](#complete-rest-ingestion-code)
+
 
 ## Architecture overview
 
